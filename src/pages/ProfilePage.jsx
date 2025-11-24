@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function ProfilePage() {
@@ -43,14 +44,16 @@ export default function ProfilePage() {
           Cerrar Sesión
         </button>
       </div>
+
+      {/* Link a Legal */}
       <div className="mt-8 pt-6 border-t">
-  <Link 
-    to="/legal" 
-    className="flex items-center justify-center gap-2 text-gray-500 hover:text-primary transition-colors"
-  >
-    📋 Términos, Privacidad y Seguridad
-  </Link>
-</div>
+        <Link 
+          to="/legal" 
+          className="flex items-center justify-center gap-2 text-gray-500 hover:text-primary transition-colors"
+        >
+          📋 Términos, Privacidad y Seguridad
+        </Link>
+      </div>
     </div>
   )
 }
