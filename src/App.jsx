@@ -7,6 +7,11 @@ import Navbar from './components/Navbar'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import CreateTrueque from './pages/CreateTrueque'
+import HospedajesPage from './pages/HospedajesPage'
+import MapPage from './pages/MapPage'
+import ChatPage from './pages/ChatPage'
+import ProfilePage from './pages/ProfilePage'
 
 function App() {
   return (
@@ -24,6 +29,36 @@ function App() {
               <Route path="/" element={
                 <ProtectedRoute>
                   <Home />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/crear-trueque" element={
+                <ProtectedRoute>
+                  <CreateTrueque />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/hospedajes" element={
+                <ProtectedRoute>
+                  <HospedajesPage />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/mapa" element={
+                <ProtectedRoute>
+                  <MapPage />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/chat" element={
+                <ProtectedRoute>
+                  <ChatPage />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/perfil" element={
+                <ProtectedRoute>
+                  <ProfilePage />
                 </ProtectedRoute>
               } />
               
