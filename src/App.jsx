@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Navbar from './components/Navbar'
+import LegalPage from './pages/LegalPage'
+import VerifyIdentity from './pages/VerifyIdentity'
 
 // Pages
 import Home from './pages/Home'
@@ -38,6 +40,8 @@ function App() {
               <Route path="/mapa" element={<ProtectedRoute><MapPage /></ProtectedRoute>} />
               <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
               <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+              <Route path="/legal" element={<LegalPage />} />
+              <Route path="/verificar" element={<ProtectedRoute><VerifyIdentity /></ProtectedRoute>} />
               
               {/* Redirect */}
               <Route path="*" element={<Navigate to="/" />} />
@@ -50,3 +54,6 @@ function App() {
 }
 
 export default App
+
+
+// Agregar rutas:

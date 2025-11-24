@@ -1,9 +1,72 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { collection, query, where, getDocs } from 'firebase/firestore'
+import { collection, query, getDocs } from 'firebase/firestore'
 import { db } from '../utils/firebase'
 import { CATEGORIES } from '../utils/categories'
-import { FaList, FaMapMarkerAlt, FaFilter, FaTimes, FaSpinner, FaBed } from 'react-icons/fa'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import { FaFilter, FaTimes, FaSpinner, FaMapMarkerAlt, FaList } from 'react-icons/fa'
+
+// Fix para iconos de Leaflet
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+})
+
+// Iconos personalizados por categoría
+const createCategoryIcon = (emoji, color = '#3AC9A8') => {
+  return L.divIcon({
+    className: 'custom-marker',
+    html: `
+      <div style="
+        background-color: ${color};
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        border: 3px solid white;
+      ">${emoji}</div>
+    `,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40]
+  })
+}
+
+// Icono del usuario
+const userIcon = L.divIcon({
+  className: 'user-marker',
+  html: `
+    <div style="
+      background-color: #3B82F6;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 4px solid white;
+      box-shadow: 0 0 0 2px #3B82F6, 0 2px 10px rgba(0,0,0,0.3);
+    "></div>
+  `,
+  iconSize: [20, 20],
+  iconAnchor: [10, 10]
+})
+
+// Componente para centrar el mapa
+function SetViewOnLocation({ coords }) {
+  const map = useMap()
+  useEffect(() => {
+    if (coords) {
+      map.setView([coords.lat, coords.lng], 13)
+    }
+  }, [coords, map])
+  return null
+}
 
 export default function MapPage() {
   const [trueques, setTrueques] = useState([])
@@ -11,16 +74,17 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true)
   const [userLocation, setUserLocation] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState(null)
-  const [selectedSubcategory, setSelectedSubcategory] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
-  const [viewMode, setViewMode] = useState('trueques') // 'trueques' | 'hospedajes'
-  const [selectedItem, setSelectedItem] = useState(null)
-  const [mapError, setMapError] = useState(null)
+  const [viewMode, setViewMode] = useState('trueques')
+  const [showList, setShowList] = useState(false)
+
+  // Ubicación por defecto (Buenos Aires)
+  const defaultLocation = { lat: -34.6037, lng: -58.3816 }
 
   useEffect(() => {
     getUserLocation()
     loadData()
-  }, [selectedCategory, selectedSubcategory, viewMode])
+  }, [viewMode])
 
   const getUserLocation = () => {
     if (navigator.geolocation) {
@@ -33,10 +97,12 @@ export default function MapPage() {
         },
         (error) => {
           console.error('Error getting location:', error)
-          // Ubicación por defecto (Buenos Aires)
-          setUserLocation({ lat: -34.6037, lng: -58.3816 })
-        }
+          setUserLocation(defaultLocation)
+        },
+        { enableHighAccuracy: true }
       )
+    } else {
+      setUserLocation(defaultLocation)
     }
   }
 
@@ -44,35 +110,18 @@ export default function MapPage() {
     setLoading(true)
     try {
       if (viewMode === 'trueques') {
-        let q = query(
-          collection(db, 'trueques'),
-          where('status', '==', 'active')
-        )
-        
-        const snapshot = await getDocs(q)
-        let data = snapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(t => t.coordinates) // Solo los que tienen ubicación
-        
-        if (selectedCategory) {
-          data = data.filter(t => t.category === selectedCategory)
-        }
-        if (selectedSubcategory) {
-          data = data.filter(t => t.subcategory === selectedSubcategory)
-        }
-        
-        setTrueques(data)
-      } else {
-        const q = query(
-          collection(db, 'hospedajes'),
-          where('status', '==', 'active')
-        )
-        
+        const q = query(collection(db, 'trueques'))
         const snapshot = await getDocs(q)
         const data = snapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(h => h.coordinates)
-        
+          .filter(t => t.coordinates && (t.status === 'active' || !t.status))
+        setTrueques(data)
+      } else {
+        const q = query(collection(db, 'hospedajes'))
+        const snapshot = await getDocs(q)
+        const data = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(h => h.coordinates && (h.status === 'active' || !h.status))
         setHospedajes(data)
       }
     } catch (error) {
@@ -81,9 +130,16 @@ export default function MapPage() {
     setLoading(false)
   }
 
-  // Calcular distancia entre dos puntos
+  // Filtrar items
+  const filteredItems = () => {
+    const items = viewMode === 'trueques' ? trueques : hospedajes
+    if (!selectedCategory) return items
+    return items.filter(item => item.category === selectedCategory)
+  }
+
+  // Calcular distancia
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371 // Radio de la Tierra en km
+    const R = 6371
     const dLat = (lat2 - lat1) * Math.PI / 180
     const dLon = (lon2 - lon1) * Math.PI / 180
     const a = 
@@ -94,138 +150,95 @@ export default function MapPage() {
     return R * c
   }
 
-  // Ordenar por distancia
-  const sortedItems = useCallback(() => {
-    if (!userLocation) return viewMode === 'trueques' ? trueques : hospedajes
-    
-    const items = viewMode === 'trueques' ? trueques : hospedajes
-    return [...items].sort((a, b) => {
-      const distA = calculateDistance(
-        userLocation.lat, userLocation.lng,
-        a.coordinates.lat, a.coordinates.lng
-      )
-      const distB = calculateDistance(
-        userLocation.lat, userLocation.lng,
-        b.coordinates.lat, b.coordinates.lng
-      )
-      return distA - distB
-    })
-  }, [trueques, hospedajes, userLocation, viewMode])
-
-  const selectedCategoryData = CATEGORIES.find(c => c.id === selectedCategory)
+  const mapCenter = userLocation || defaultLocation
 
   return (
     <div className="h-[calc(100vh-80px)] flex flex-col">
-      {/* Header con filtros */}
-      <div className="bg-white shadow-md p-4 z-10">
+      {/* Header */}
+      <div className="bg-white shadow-md p-4 z-20 relative">
         {/* Toggle Trueques/Hospedajes */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-3">
           <button
             onClick={() => setViewMode('trueques')}
             className={`flex-1 py-2 rounded-lg font-medium transition-all ${
               viewMode === 'trueques'
-                ? 'bg-primary text-white'
-                : 'bg-gray-100 text-gray-600'
+                ? 'bg-primary text-white shadow-md'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            📦 Trueques
+            📦 Trueques ({trueques.length})
           </button>
           <button
             onClick={() => setViewMode('hospedajes')}
             className={`flex-1 py-2 rounded-lg font-medium transition-all ${
               viewMode === 'hospedajes'
-                ? 'bg-accent text-white'
-                : 'bg-gray-100 text-gray-600'
+                ? 'bg-accent text-white shadow-md'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            🏠 Hospedajes
+            🏠 Hospedajes ({hospedajes.length})
           </button>
         </div>
 
-        {/* Filtros para trueques */}
-        {viewMode === 'trueques' && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-                showFilters || selectedCategory
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100'
-              }`}
-            >
-              <FaFilter />
-              Filtros
-              {selectedCategory && (
-                <span className="bg-white text-primary text-xs px-1 rounded">1</span>
-              )}
-            </button>
-            
-            {selectedCategory && (
-              <button
-                onClick={() => {
-                  setSelectedCategory(null)
-                  setSelectedSubcategory(null)
-                }}
-                className="px-3 py-2 bg-gray-100 rounded-lg flex items-center gap-1 text-sm"
-              >
-                {CATEGORIES.find(c => c.id === selectedCategory)?.icon}
-                {CATEGORIES.find(c => c.id === selectedCategory)?.name}
-                <FaTimes className="text-gray-400" />
-              </button>
-            )}
-          </div>
-        )}
+        {/* Botones de acción */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-4 py-2 rounded-lg flex items-center gap-2 flex-1 justify-center ${
+              showFilters || selectedCategory
+                ? 'bg-primary text-white'
+                : 'bg-gray-100 hover:bg-gray-200'
+            }`}
+          >
+            <FaFilter />
+            Filtros
+            {selectedCategory && <span className="bg-white text-primary text-xs px-1.5 rounded-full">1</span>}
+          </button>
+          <button
+            onClick={() => setShowList(!showList)}
+            className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+              showList ? 'bg-primary text-white' : 'bg-gray-100 hover:bg-gray-200'
+            }`}
+          >
+            <FaList />
+          </button>
+          <button
+            onClick={getUserLocation}
+            className="px-4 py-2 rounded-lg bg-blue-500 text-white flex items-center gap-2"
+          >
+            <FaMapMarkerAlt />
+          </button>
+        </div>
 
         {/* Panel de filtros */}
         {showFilters && viewMode === 'trueques' && (
-          <div className="mt-4 pt-4 border-t animate-fadeIn">
-            <p className="text-sm font-medium mb-2">Categoría</p>
+          <div className="mt-3 pt-3 border-t animate-fadeIn">
             <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className={`px-3 py-1 rounded-full text-sm ${
+                  !selectedCategory ? 'bg-primary text-white' : 'bg-gray-100'
+                }`}
+              >
+                Todas
+              </button>
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat.id}
-                  onClick={() => {
-                    setSelectedCategory(cat.id === selectedCategory ? null : cat.id)
-                    setSelectedSubcategory(null)
-                  }}
+                  onClick={() => setSelectedCategory(cat.id === selectedCategory ? null : cat.id)}
                   className={`px-3 py-1 rounded-full text-sm flex items-center gap-1 ${
-                    selectedCategory === cat.id
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-100 hover:bg-gray-200'
+                    selectedCategory === cat.id ? 'bg-primary text-white' : 'bg-gray-100'
                   }`}
                 >
                   {cat.icon} {cat.name}
                 </button>
               ))}
             </div>
-
-            {selectedCategoryData?.subcategories && (
-              <div className="mt-3">
-                <p className="text-sm font-medium mb-2">Subcategoría</p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedCategoryData.subcategories.map((sub) => (
-                    <button
-                      key={sub.id}
-                      onClick={() => setSelectedSubcategory(
-                        sub.id === selectedSubcategory ? null : sub.id
-                      )}
-                      className={`px-3 py-1 rounded-full text-sm ${
-                        selectedSubcategory === sub.id
-                          ? 'bg-primary text-white'
-                          : 'bg-gray-100 hover:bg-gray-200'
-                      }`}
-                    >
-                      {sub.icon} {sub.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
 
-      {/* Mapa o Lista */}
+      {/* Mapa */}
       <div className="flex-1 relative">
         {loading ? (
           <div className="h-full flex items-center justify-center bg-gray-100">
@@ -235,149 +248,122 @@ export default function MapPage() {
             </div>
           </div>
         ) : (
-          <>
-            {/* Mapa placeholder - Integrar con Google Maps o Leaflet */}
-            <div className="h-full bg-gradient-to-b from-blue-100 to-green-100 relative overflow-hidden">
-              {/* Fondo simulando mapa */}
-              <div className="absolute inset-0 opacity-20">
-                <div className="grid grid-cols-10 h-full">
-                  {Array(100).fill(0).map((_, i) => (
-                    <div key={i} className="border border-gray-300" />
-                  ))}
-                </div>
-              </div>
-
-              {/* Ubicación del usuario */}
-              {userLocation && (
-                <div 
-                  className="absolute z-10"
-                  style={{
-                    left: '50%',
-                    top: '50%',
-                    transform: 'translate(-50%, -50%)'
-                  }}
-                >
-                  <div className="relative">
-                    <div className="w-6 h-6 bg-blue-500 rounded-full border-4 border-white shadow-lg" />
-                    <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-30" />
-                  </div>
-                  <p className="text-xs font-medium text-center mt-1 bg-white px-2 py-1 rounded shadow">
-                    Tú
-                  </p>
-                </div>
-              )}
-
-              {/* Markers de trueques/hospedajes */}
-              {sortedItems().slice(0, 20).map((item, index) => (
-                <div
-                  key={item.id}
-                  onClick={() => setSelectedItem(item)}
-                  className="absolute cursor-pointer transform hover:scale-110 transition-transform"
-                  style={{
-                    left: `${20 + (index % 5) * 15}%`,
-                    top: `${20 + Math.floor(index / 5) * 20}%`
-                  }}
-                >
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg ${
-                    viewMode === 'trueques' ? 'bg-primary' : 'bg-accent'
-                  } text-white text-lg`}>
-                    {viewMode === 'trueques' ? item.categoryIcon : '🏠'}
-                  </div>
-                </div>
-              ))}
-
-              {/* Info del item seleccionado */}
-              {selectedItem && (
-                <div className="absolute bottom-4 left-4 right-4 z-20">
-                  <div className="bg-white rounded-xl shadow-xl p-4 animate-fadeIn">
-                    <button
-                      onClick={() => setSelectedItem(null)}
-                      className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
-                    >
-                      <FaTimes />
-                    </button>
-                    
-                    <div className="flex gap-4">
-                      <img
-                        src={selectedItem.images?.[0]}
-                        alt=""
-                        className="w-20 h-20 rounded-lg object-cover"
-                      />
-                      <div className="flex-1">
-                        <p className="font-bold text-gray-800 line-clamp-1">
-                          {selectedItem.title}
-                        </p>
-                        <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                          <FaMapMarkerAlt className="text-primary" />
-                          {selectedItem.location}
-                        </p>
-                        {userLocation && selectedItem.coordinates && (
-                          <p className="text-xs text-gray-400 mt-1">
-                            A {calculateDistance(
-                              userLocation.lat, userLocation.lng,
-                              selectedItem.coordinates.lat, selectedItem.coordinates.lng
-                            ).toFixed(1)} km
-                          </p>
-                        )}
-                        <Link
-                          to={viewMode === 'trueques' 
-                            ? `/trueque/${selectedItem.id}`
-                            : `/hospedaje/${selectedItem.id}`
-                          }
-                          className="text-primary text-sm font-medium mt-2 inline-block"
-                        >
-                          Ver detalle →
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Contador */}
-            <div className="absolute top-4 right-4 bg-white px-3 py-2 rounded-lg shadow-md">
-              <p className="text-sm font-medium">
-                {sortedItems().length} {viewMode === 'trueques' ? 'trueques' : 'hospedajes'}
-              </p>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Lista inferior */}
-      <div className="bg-white border-t max-h-48 overflow-y-auto">
-        <p className="px-4 py-2 text-sm font-medium text-gray-500 border-b sticky top-0 bg-white">
-          {viewMode === 'trueques' ? 'Trueques cercanos' : 'Hospedajes cercanos'}
-        </p>
-        {sortedItems().slice(0, 10).map((item) => (
-          <Link
-            key={item.id}
-            to={viewMode === 'trueques' 
-              ? `/trueque/${item.id}`
-              : `/hospedaje/${item.id}`
-            }
-            className="flex items-center gap-3 p-3 border-b hover:bg-gray-50"
+          <MapContainer
+            center={[mapCenter.lat, mapCenter.lng]}
+            zoom={13}
+            style={{ height: '100%', width: '100%' }}
+            className="z-10"
           >
-            <img
-              src={item.images?.[0]}
-              alt=""
-              className="w-12 h-12 rounded-lg object-cover"
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-sm truncate">{item.title}</p>
-              <p className="text-xs text-gray-500 truncate">{item.location}</p>
-            </div>
-            {userLocation && item.coordinates && (
-              <span className="text-xs text-gray-400 whitespace-nowrap">
-                {calculateDistance(
-                  userLocation.lat, userLocation.lng,
-                  item.coordinates.lat, item.coordinates.lng
-                ).toFixed(1)} km
-              </span>
+
+            <SetViewOnLocation coords={userLocation} />
+
+            {/* Marcador del usuario */}
+            {userLocation && (
+              <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon}>
+                <Popup>
+                  <div className="text-center">
+                    <p className="font-bold">📍 Tu ubicación</p>
+                  </div>
+                </Popup>
+              </Marker>
             )}
-          </Link>
-        ))}
+
+            {/* Marcadores de trueques/hospedajes */}
+            {filteredItems().map((item) => {
+              const category = CATEGORIES.find(c => c.id === item.category)
+              const icon = createCategoryIcon(
+                viewMode === 'hospedajes' ? '🏠' : (category?.icon || '📦'),
+                viewMode === 'hospedajes' ? '#FF6B9D' : (category?.color || '#3AC9A8')
+              )
+              
+              return (
+                <Marker
+                  key={item.id}
+                  position={[item.coordinates.lat, item.coordinates.lng]}
+                  icon={icon}
+                >
+                  <Popup>
+                    <div className="min-w-[200px]">
+                      {item.images?.[0] && (
+                        <img 
+                          src={item.images[0]} 
+                          alt="" 
+                          className="w-full h-24 object-cover rounded-t-lg -mt-3 -mx-3 mb-2"
+                          style={{ width: 'calc(100% + 24px)' }}
+                        />
+                      )}
+                      <h3 className="font-bold text-gray-800 line-clamp-1">{item.title}</h3>
+                      <p className="text-sm text-gray-500 line-clamp-2 mt-1">{item.description}</p>
+                      <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                        <FaMapMarkerAlt className="text-primary" />
+                        {item.location}
+                      </p>
+                      {userLocation && (
+                        <p className="text-xs text-gray-400">
+                          A {calculateDistance(
+                            userLocation.lat, userLocation.lng,
+                            item.coordinates.lat, item.coordinates.lng
+                          ).toFixed(1)} km
+                        </p>
+                      )}
+                      <Link
+                        to={viewMode === 'trueques' ? `/trueque/${item.id}` : `/hospedaje/${item.id}`}
+                        className="block mt-3 text-center bg-primary text-white py-2 rounded-lg text-sm font-medium hover:bg-primary/90"
+                      >
+                        Ver detalle
+                      </Link>
+                    </div>
+                  </Popup>
+                </Marker>
+              )
+            })}
+          </MapContainer>
+        )}
+
+        {/* Lista lateral */}
+        {showList && (
+          <div className="absolute top-0 right-0 w-80 h-full bg-white shadow-xl z-20 overflow-hidden animate-fadeIn">
+            <div className="p-3 border-b flex items-center justify-between bg-gray-50">
+              <h3 className="font-bold text-gray-800">
+                {filteredItems().length} {viewMode === 'trueques' ? 'trueques' : 'hospedajes'}
+              </h3>
+              <button onClick={() => setShowList(false)} className="text-gray-400 hover:text-gray-600">
+                <FaTimes />
+              </button>
+            </div>
+            <div className="overflow-y-auto h-[calc(100%-50px)]">
+              {filteredItems().map((item) => (
+                <Link
+                  key={item.id}
+                  to={viewMode === 'trueques' ? `/trueque/${item.id}` : `/hospedaje/${item.id}`}
+                  className="flex gap-3 p-3 border-b hover:bg-gray-50"
+                >
+                  <img
+                    src={item.images?.[0] || 'https://via.placeholder.com/60'}
+                    alt=""
+                    className="w-16 h-16 rounded-lg object-cover"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm line-clamp-1">{item.title}</p>
+                    <p className="text-xs text-gray-500 line-clamp-1">{item.location}</p>
+                    {userLocation && item.coordinates && (
+                      <p className="text-xs text-primary mt-1">
+                        {calculateDistance(
+                          userLocation.lat, userLocation.lng,
+                          item.coordinates.lat, item.coordinates.lng
+                        ).toFixed(1)} km
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
