@@ -8,7 +8,10 @@ import Home from './pages/Home'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import CreateTrueque from './pages/CreateTrueque'
+import TruequeDetail from './pages/TruequeDetail'
 import HospedajesPage from './pages/HospedajesPage'
+import CreateHospedaje from './pages/CreateHospedaje'
+import HospedajeDetail from './pages/HospedajeDetail'
 import MapPage from './pages/MapPage'
 import ChatPage from './pages/ChatPage'
 import ProfilePage from './pages/ProfilePage'
@@ -26,41 +29,15 @@ function App() {
               <Route path="/register" element={<Register />} />
               
               {/* Protected routes */}
-              <Route path="/" element={
-                <ProtectedRoute>
-                  <Home />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/crear-trueque" element={
-                <ProtectedRoute>
-                  <CreateTrueque />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/hospedajes" element={
-                <ProtectedRoute>
-                  <HospedajesPage />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/mapa" element={
-                <ProtectedRoute>
-                  <MapPage />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/chat" element={
-                <ProtectedRoute>
-                  <ChatPage />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/perfil" element={
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              } />
+              <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+              <Route path="/crear-trueque" element={<ProtectedRoute><CreateTrueque /></ProtectedRoute>} />
+              <Route path="/trueque/:id" element={<ProtectedRoute><TruequeDetail /></ProtectedRoute>} />
+              <Route path="/hospedajes" element={<ProtectedRoute><HospedajesPage /></ProtectedRoute>} />
+              <Route path="/crear-hospedaje" element={<ProtectedRoute><CreateHospedaje /></ProtectedRoute>} />
+              <Route path="/hospedaje/:id" element={<ProtectedRoute><HospedajeDetail /></ProtectedRoute>} />
+              <Route path="/mapa" element={<ProtectedRoute><MapPage /></ProtectedRoute>} />
+              <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+              <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
               
               {/* Redirect */}
               <Route path="*" element={<Navigate to="/" />} />
