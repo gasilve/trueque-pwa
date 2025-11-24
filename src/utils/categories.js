@@ -27,3 +27,48 @@ export const AMENITIES = [
   { id: 'lavadora', name: 'Lavadora', icon: '🧺' },
   { id: 'mascotas', name: 'Mascotas Permitidas', icon: '🐕' }
 ]
+
+export const HOSPEDAJE_EXCHANGE_TYPES = {
+  trabajo: {
+    name: 'Trabajo Doméstico',
+    options: [
+      { id: 'limpieza', name: 'Limpieza', icon: '🧹' },
+      { id: 'cocinar', name: 'Cocinar', icon: '👨‍🍳' },
+      { id: 'jardineria', name: 'Jardinería', icon: '🌱' },
+      { id: 'mascotas', name: 'Cuidar mascotas', icon: '🐕' },
+      { id: 'lavanderia', name: 'Lavandería', icon: '🧺' }
+    ]
+  },
+  habilidades: {
+    name: 'Habilidades',
+    options: [
+      { id: 'diseno', name: 'Diseño', icon: '🎨' },
+      { id: 'programacion', name: 'Programación', icon: '💻' },
+      { id: 'idiomas', name: 'Enseñar idiomas', icon: '🗣️' },
+      { id: 'musica', name: 'Música', icon: '🎵' },
+      { id: 'fotografia', name: 'Fotografía', icon: '📸' },
+      { id: 'entrenamiento', name: 'Entrenamiento', icon: '💪' }
+    ]
+  },
+  compania: {
+    name: 'Compañía & Experiencias',
+    options: [
+      { id: 'poesia', name: 'Leer poesía', icon: '📜' },
+      { id: 'historias', name: 'Contar historias', icon: '📖' },
+      { id: 'musica_vivo', name: 'Tocar música', icon: '🎸' },
+      { id: 'juegos', name: 'Juegos de mesa', icon: '🎲' },
+      { id: 'conversacion', name: 'Conversación', icon: '💬' },
+      { id: 'cultural', name: 'Intercambio cultural', icon: '🌍' }
+    ]
+  },
+  ensenanza: {
+    name: 'Enseñanza',
+    options: [
+      { id: 'musica_clase', name: 'Clases de música', icon: '🎹' },
+      { id: 'cocina_clase', name: 'Clases de cocina', icon: '🍳' },
+      { id: 'yoga', name: 'Yoga/Meditación', icon: '🧘' },
+      { id: 'baile', name: 'Clases de baile', icon: '💃' },
+      { id: 'arte', name: 'Arte/Manualidades', icon: '🎨' }
+    ]
+  }
+}

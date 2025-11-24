@@ -10,7 +10,12 @@ export async function uploadToCloudinary(file, folder = 'trueque') {
   formData.append('folder', folder)
 
   try {
-    const response = await axios.post(CLOUDINARY_URL, formData)
+    const response = await axios.post(CLOUDINARY_URL, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    
     return {
       success: true,
       url: response.data.secure_url,
@@ -26,7 +31,14 @@ export async function uploadToCloudinary(file, folder = 'trueque') {
 }
 
 export async function uploadMultipleToCloudinary(files, folder = 'trueque') {
-  const uploadPromises = files.map(file => uploadToCloudinary(file, folder))
+  const uploadPromises = Array.from(files).map(file => 
+    uploadToCloudinary(file, folder)
+  )
+  
   const results = await Promise.all(uploadPromises)
-  return results.filter(r => r.success).map(r => r.url)
+  const successfulUploads = results
+    .filter(r => r.success)
+    .map(r => r.url)
+    
+  return successfulUploads
 }
