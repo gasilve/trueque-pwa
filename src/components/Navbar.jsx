@@ -102,6 +102,7 @@ export default function Navbar() {
               >
                 <Icon className="text-xl" />
                 <span className="text-xs mt-1">{item.label}</span>
+                
               </Link>
             )
           })}

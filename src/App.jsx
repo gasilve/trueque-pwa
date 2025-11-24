@@ -4,6 +4,8 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Navbar from './components/Navbar'
 import LegalPage from './pages/LegalPage'
 import VerifyIdentity from './pages/VerifyIdentity'
+import HospedajeDetail from './pages/HospedajeDetail'
+import LegalPage from './pages/LegalPage'
 
 // Pages
 import Home from './pages/Home'
@@ -17,18 +19,23 @@ import HospedajeDetail from './pages/HospedajeDetail'
 import MapPage from './pages/MapPage'
 import ChatPage from './pages/ChatPage'
 import ProfilePage from './pages/ProfilePage'
+import Footer from './components/Footer'
 
 function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen flex flex-col bg-background">
           <Navbar />
+          <main className="flex-1"></main>
           <main className="pb-20">
             <Routes>
               {/* Public routes */}
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/hospedaje/:id" element={<HospedajeDetail />} />
+              <Route path="/legal" element={<LegalPage />} />
+
               
               {/* Protected routes */}
               <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
@@ -47,6 +54,7 @@ function App() {
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </main>
+          <Footer />
         </div>
       </Router>
     </AuthProvider>
